@@ -19,6 +19,15 @@ import {
 } from '@/components/ui/breadcrumb';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { ApiClientError } from '@/lib/api';
+
+function getAuthErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiClientError) return err.message;
+  if (err instanceof Error && (err.message === 'Failed to fetch' || err.message.includes('NetworkError'))) {
+    return 'Cannot reach server. Check the backend is running and CORS allows this origin.';
+  }
+  return fallback;
+}
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -29,12 +38,20 @@ const Auth = () => {
   const safeRedirect = redirectTo?.startsWith('/') ? redirectTo : '/';
   const { cartCount, openCart, items, updateQuantity, removeItem, isCartOpen, closeCart } = useCart();
 
+  const redirectWithToast = (message: string) => {
+    toast.success(message);
+    setTimeout(() => navigate(safeRedirect), 400);
+  };
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail.trim()) {
       toast.error('Please enter your email');
@@ -44,18 +61,33 @@ const Auth = () => {
       toast.error('Please enter your password');
       return;
     }
-    if (login(loginEmail, loginPassword)) {
-      toast.success('Welcome back!');
-      navigate(safeRedirect);
-    } else {
-      toast.error('Invalid email or password');
+    setLoading(true);
+    try {
+      const ok = await login(loginEmail, loginPassword);
+      if (ok) {
+        redirectWithToast('Login successful! Welcome back.');
+      } else {
+        toast.error('Invalid email or password');
+      }
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err, 'Login failed. Please try again.'));
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!signupName.trim()) {
+      toast.error('Please enter your name');
+      return;
+    }
     if (!signupEmail.trim()) {
       toast.error('Please enter your email');
+      return;
+    }
+    if (!signupPhone.trim()) {
+      toast.error('Please enter your phone number');
       return;
     }
     if (!signupPassword) {
@@ -66,11 +98,18 @@ const Auth = () => {
       toast.error('Password must be at least 6 characters');
       return;
     }
-    if (signup(signupEmail, signupPassword)) {
-      toast.success('Account created! Welcome to HFD.');
-      navigate(safeRedirect);
-    } else {
-      toast.error('Please enter email and password');
+    setLoading(true);
+    try {
+      const ok = await signup(signupEmail, signupPassword, signupName.trim(), signupPhone.trim());
+      if (ok) {
+        redirectWithToast('Registration successful! Welcome to HFD.');
+      } else {
+        toast.error('Sign up failed. No token received from server.');
+      }
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err, 'Sign up failed. Please try again.'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,8 +206,8 @@ const Auth = () => {
                       Forgot password?
                     </button>
                   </div>
-                  <Button type="submit" size="lg" className="w-full h-11">
-                    Sign in
+                  <Button type="submit" size="lg" className="w-full h-11" disabled={loading}>
+                    {loading ? 'Signing in…' : 'Sign in'}
                   </Button>
                 </form>
               </TabsContent>
@@ -180,6 +219,18 @@ const Auth = () => {
                   style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
                 >
                   <div className="space-y-2">
+                    <Label htmlFor="signup-name">Name</Label>
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="Your name"
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                      autoComplete="name"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
                       id="signup-email"
@@ -188,6 +239,18 @@ const Auth = () => {
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       autoComplete="email"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone">Phone</Label>
+                    <Input
+                      id="signup-phone"
+                      type="tel"
+                      placeholder="e.g. 9820550527"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      autoComplete="tel"
                       className="h-11"
                     />
                   </div>
@@ -203,8 +266,8 @@ const Auth = () => {
                       className="h-11"
                     />
                   </div>
-                  <Button type="submit" size="lg" className="w-full h-11">
-                    Create account
+                  <Button type="submit" size="lg" className="w-full h-11" disabled={loading}>
+                    {loading ? 'Creating account…' : 'Create account'}
                   </Button>
                 </form>
               </TabsContent>

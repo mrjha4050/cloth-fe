@@ -68,10 +68,6 @@ export default function Hero() {
                 <span className="text-secondary">★★★★★</span>
                 <span>4.9/5 Reviews</span>
               </div>
-              <div>|</div>
-              <div>Free Alterations</div>
-              <div>|</div>
-              <div>COD Available</div>
             </div>
           </div>
 

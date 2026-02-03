@@ -20,6 +20,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { addOrder } from '@/data/orders';
+import { getProfile } from '@/lib/profile';
 import { cn } from '@/lib/utils';
 
 const SHIPPING_FREE_THRESHOLD = 2999;
@@ -27,7 +28,7 @@ const SHIPPING_COST = 99;
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { items, cartCount, updateQuantity, removeItem, clearCart, isCartOpen, closeCart, openCart } = useCart();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +54,22 @@ const Checkout = () => {
       navigate('/auth?redirect=/checkout', { replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const profile = getProfile(user.email);
+    setForm((prev) => ({
+      ...prev,
+      fullName: prev.fullName || profile?.fullName || user.name || '',
+      email: user.email,
+      phone: prev.phone || profile?.phone || '',
+      addressLine1: prev.addressLine1 || profile?.addressLine1 || '',
+      addressLine2: prev.addressLine2 || profile?.addressLine2 || '',
+      city: prev.city || profile?.city || '',
+      state: prev.state || profile?.state || '',
+      pincode: prev.pincode || profile?.pincode || '',
+    }));
+  }, [isAuthenticated, user?.email]);
 
   if (!isAuthenticated) {
     return null;

@@ -9,19 +9,9 @@ const features = [
     description: 'On orders above ₹2,999',
   },
   {
-    icon: RotateCcw,
-    title: 'Easy Returns',
-    description: '7-day return policy',
-  },
-  {
     icon: Shield,
     title: 'Secure Payment',
     description: '100% secure checkout',
-  },
-  {
-    icon: Sparkles,
-    title: 'Free Alterations',
-    description: 'Perfect fit guaranteed',
   },
 ];
 
