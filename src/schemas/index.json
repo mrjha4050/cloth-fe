@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chic-threads-india/schemas",
+  "$defs": {
+    "Product": {
+      "type": "object",
+      "required": ["id", "name", "price", "image", "category"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "isNew": { "type": "boolean" },
+        "isBestseller": { "type": "boolean" },
+        "description": { "type": "string" },
+        "sizes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProductReview": {
+      "type": "object",
+      "required": ["id", "author", "rating", "text", "likes", "dislikes", "date"],
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "text": { "type": "string" },
+        "likes": { "type": "number" },
+        "dislikes": { "type": "number" },
+        "date": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ColorOption": {
+      "type": "object",
+      "required": ["name", "hex"],
+      "properties": {
+        "name": { "type": "string" },
+        "hex": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "RatingDistributionItem": {
+      "type": "object",
+      "required": ["stars", "count"],
+      "properties": {
+        "stars": { "type": "number" },
+        "count": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "ProductDetail": {
+      "type": "object",
+      "required": [
+        "id", "name", "price", "image", "category",
+        "description", "images", "colors", "sizes",
+        "soldCount", "rating", "reviewCount", "reviews", "ratingDistribution"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "isNew": { "type": "boolean" },
+        "isBestseller": { "type": "boolean" },
+        "description": { "type": "string" },
+        "longDescription": { "type": "string" },
+        "images": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "colors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ColorOption" }
+        },
+        "sizes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "soldCount": { "type": "number" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "reviews": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProductReview" }
+        },
+        "ratingDistribution": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RatingDistributionItem" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrderItem": {
+      "type": "object",
+      "required": ["id", "name", "image", "price", "quantity"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "ShippingAddress": {
+      "type": "object",
+      "required": ["fullName", "email", "phone", "addressLine1", "city", "state", "pincode"],
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "addressLine1": { "type": "string" },
+        "addressLine2": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "pincode": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "OrderStatus": {
+      "type": "string",
+      "enum": ["confirmed", "shipped", "delivered"]
+    },
+    "Order": {
+      "type": "object",
+      "required": [
+        "id", "createdAt", "status", "items", "shippingAddress",
+        "subtotal", "shipping", "total", "paymentMethod"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/OrderStatus" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OrderItem" }
+        },
+        "shippingAddress": { "$ref": "#/$defs/ShippingAddress" },
+        "subtotal": { "type": "number" },
+        "shipping": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
