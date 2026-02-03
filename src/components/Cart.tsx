@@ -1,11 +1,8 @@
+import { Link } from 'react-router-dom';
 import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Product } from '@/data/products';
-
-interface CartItem extends Product {
-  quantity: number;
-}
+import type { CartItem } from '@/context/CartContext';
 
 interface CartProps {
   isOpen: boolean;
@@ -91,8 +88,10 @@ const Cart = ({ isOpen, onClose, items, onUpdateQuantity, onRemove }: CartProps)
               <p className="text-sm text-muted-foreground">
                 Shipping & taxes calculated at checkout
               </p>
-              <Button className="w-full" size="lg">
-                Proceed to Checkout
+              <Button className="w-full" size="lg" asChild>
+                <Link to="/checkout" onClick={onClose}>
+                  Proceed to Checkout
+                </Link>
               </Button>
               <Button variant="outline" className="w-full" onClick={onClose}>
                 Continue Shopping

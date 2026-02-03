@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,7 @@ const ProductCard = ({ product, onAddToCart }: ProductCardProps) => {
   return (
     <div className="group bg-card rounded-xl overflow-hidden border border-border hover:shadow-xl transition-all duration-300">
       {/* Image */}
-      <div className="relative aspect-[3/4] overflow-hidden">
+      <Link to={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden">
         <img
           src={product.image}
           alt={product.name}
@@ -45,19 +46,25 @@ const ProductCard = ({ product, onAddToCart }: ProductCardProps) => {
 
         {/* Add to cart overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button 
-            className="w-full" 
-            onClick={() => onAddToCart(product)}
+          <Button
+            className="w-full"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAddToCart(product);
+            }}
           >
             <ShoppingBag className="h-4 w-4 mr-2" />
             Add to Cart
           </Button>
         </div>
-      </div>
+      </Link>
 
       {/* Details */}
       <div className="p-4">
-        <h3 className="font-medium text-foreground mb-1 truncate">{product.name}</h3>
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-medium text-foreground mb-1 truncate hover:text-primary transition-colors">{product.name}</h3>
+        </Link>
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-primary">₹{product.price.toLocaleString()}</span>
           {product.originalPrice && (

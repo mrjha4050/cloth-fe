@@ -1,15 +1,21 @@
-import { categories } from '@/data/products';
+import { useSiteContent } from '@/context/SiteContentContext';
 
-const Categories = () => {
+const CATEGORIES_REVEAL_DELAY_MS = 500;
+
+export default function Categories() {
+  const { categories, headings } = useSiteContent();
   return (
-    <section className="py-16 bg-muted/50">
-      <div className="container mx-auto px-4">
+    <section className="pt-32 lg:pt-40 pb-16 bg-muted/50">
+      <div
+        className="container mx-auto px-4 opacity-0 animate-fade-in-up"
+        style={{ animationDelay: `${CATEGORIES_REVEAL_DELAY_MS}ms` }}
+      >
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Shop by Category
+            {headings.categoriesTitle}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Explore our curated collection of traditional and contemporary Indian wear
+            {headings.categoriesSubtitle}
           </p>
         </div>
 
@@ -32,6 +38,4 @@ const Categories = () => {
       </div>
     </section>
   );
-};
-
-export default Categories;
+}

@@ -1,0 +1,6 @@
+Frontend Design Skill - License
+
+Complete terms for use and distribution of this skill are defined by the 
+repository or project that contains it. If no separate license is specified 
+in the project root, this skill is provided for use within that project 
+under the same terms as the project's primary license.

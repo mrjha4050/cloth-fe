@@ -1,8 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400..700;1,400..700&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
 @layer base {
   :root {
@@ -93,10 +95,38 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', serif;
+  }
+}
+
+/* Admin dashboard — Shopify/Polaris-inspired */
+.admin-dashboard {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --admin-bg: #f6f6f7;
+  --admin-surface: #ffffff;
+  --admin-text: #202223;
+  --admin-text-subdued: #6d7175;
+  --admin-border: #e1e3e5;
+  --admin-border-strong: #c9cccf;
+  --admin-accent: #008060;
+  --admin-accent-hover: #006e52;
+  --admin-accent-bg: #e3f1df;
+  --admin-critical: #d72c0d;
+  --admin-critical-bg: #fbeae5;
+  --admin-radius: 8px;
+}
+
+/* Respect prefers-reduced-motion: show content immediately without fade-in-up */
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 }

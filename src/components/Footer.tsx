@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Twitter, Youtube } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ const Footer = () => {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-xl mx-auto text-center">
             <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-              Join the रानी Family
+              Join the HFD Family
             </h3>
             <p className="text-background/70 mb-6">
               Subscribe for exclusive offers, styling tips & early access to new collections
@@ -45,6 +46,8 @@ const Footer = () => {
           <div>
             <h4 className="font-bold mb-4">Help</h4>
             <ul className="space-y-2 text-background/70">
+              <li><Link to="/auth" className="hover:text-background transition-colors">Login</Link></li>
+              <li><Link to="/orders" className="hover:text-background transition-colors">My Orders</Link></li>
               <li><a href="#" className="hover:text-background transition-colors">Track Order</a></li>
               <li><a href="#" className="hover:text-background transition-colors">Returns</a></li>
               <li><a href="#" className="hover:text-background transition-colors">Shipping Info</a></li>
@@ -90,8 +93,9 @@ const Footer = () => {
       <div className="border-t border-background/10">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-background/60">
-            <p>© 2024 रानी Couture. All rights reserved.</p>
+            <p>© 2024 HFD — High Fashion Design. All rights reserved.</p>
             <div className="flex gap-6">
+              <Link to="/admin" className="hover:text-background text-background/50">Admin</Link>
               <a href="#" className="hover:text-background">Privacy Policy</a>
               <a href="#" className="hover:text-background">Terms of Service</a>
             </div>
