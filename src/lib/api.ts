@@ -1,7 +1,11 @@
 /**
  * Backend API client.
  * Base URL: VITE_API_URL (e.g. http://localhost:8080). All paths use /api prefix.
- * Auth: JWT sent as Authorization: Bearer <token>.
+ *
+ * Auth (per backend spec):
+ * - Header: Authorization: Bearer <jwt>
+ * - One space after "Bearer", no quotes around the token, raw JWT string.
+ * - Token from login/register (e.g. data.token or token). Missing/invalid format → 401.
  */
 
 const TOKEN_KEY = 'hfd_token';
@@ -21,8 +25,13 @@ export function getToken(): string | null {
 
 export function setToken(token: string | null): void {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token) {
+      const jwt = token.trim();
+      if (jwt) localStorage.setItem(TOKEN_KEY, jwt);
+      else localStorage.removeItem(TOKEN_KEY);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
   } catch {
     // ignore
   }
@@ -81,7 +90,10 @@ export async function request<T = unknown>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) {
+    const jwt = token.trim();
+    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+  }
 
   const init: RequestInit = { method, headers };
   if (body !== undefined && body !== null && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
@@ -103,7 +115,19 @@ export async function request<T = unknown>(
   }
 
   if (json === undefined) return undefined as T;
-  if (typeof json === 'object' && json !== null && 'data' in json) return (json as ApiSuccess<T>).data as T;
+  if (typeof json === 'object' && json !== null && 'data' in json) {
+    const raw = json as Record<string, unknown>;
+    const inner = raw.data as Record<string, unknown> | undefined;
+    // Backend may send token at top level (e.g. { data: { user }, token }) — don't drop it
+    const authKeys = ['token', 'accessToken', 'access_token', 'jwt', 'id_token'];
+    let result = inner && typeof inner === 'object' ? { ...inner } : {};
+    for (const k of authKeys) {
+      if (typeof raw[k] === 'string' && !(result as Record<string, unknown>)[k]) {
+        (result as Record<string, unknown>)[k] = raw[k];
+      }
+    }
+    return result as T;
+  }
   return json as T;
 }
 
@@ -120,15 +144,32 @@ export interface LoginResponse {
   user?: { name?: string; email?: string };
 }
 
-/** Extract JWT from common backend response shapes (token, accessToken, data.token). */
+const TOKEN_KEYS = ['token', 'accessToken', 'access_token', 'jwt', 'id_token'];
+
+function tryTokenFrom(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/** Extract JWT from common backend response shapes (token, accessToken, data.token, data.auth.token, etc.). */
 export function getTokenFromResponse(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null;
   const obj = data as Record<string, unknown>;
-  if (typeof obj.token === 'string') return obj.token;
-  if (typeof obj.accessToken === 'string') return obj.accessToken;
-  if (typeof obj.jwt === 'string') return obj.jwt;
+  const top = tryTokenFrom(obj, TOKEN_KEYS);
+  if (top) return top;
   const nested = obj.data as Record<string, unknown> | undefined;
-  if (nested && typeof nested === 'object' && typeof nested.token === 'string') return nested.token;
+  if (nested && typeof nested === 'object') {
+    const fromNested = tryTokenFrom(nested, TOKEN_KEYS);
+    if (fromNested) return fromNested;
+    const auth = nested.auth as Record<string, unknown> | undefined;
+    if (auth && typeof auth === 'object') {
+      const fromAuth = tryTokenFrom(auth, TOKEN_KEYS);
+      if (fromAuth) return fromAuth;
+    }
+  }
   return null;
 }
 
