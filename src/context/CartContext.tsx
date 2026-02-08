@@ -1,12 +1,35 @@
-import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import {
+  createContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from 'react';
 import { Product } from '@/data/products';
 import { useAuth } from '@/context/AuthContext';
 import { useSiteContent } from '@/context/SiteContentContext';
 import { cart as cartApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { CartContext, type CartContextValue, type CartItem } from '@/context/cartContext';
 
-export type { CartItem };
+export interface CartItem extends Product {
+  quantity: number;
+  /** Backend cart line id for update/remove when authenticated */
+  itemId?: string;
+}
+
+interface CartContextValue {
+  items: CartItem[];
+  cartCount: number;
+  addItem: (product: Product, quantity?: number) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+  removeItem: (id: string) => void;
+  clearCart: () => void;
+  isCartOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
+}
+
+export const CartContext = createContext<CartContextValue | null>(null);
 
 /** Normalized row: product id, quantity, optional line id (backend cart model may use different names). */
 type CartRow = { productId: string; quantity: number; itemId?: string };
