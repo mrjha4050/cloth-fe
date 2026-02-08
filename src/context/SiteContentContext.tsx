@@ -6,9 +6,9 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import type { Product } from '@/data/products';
-import { products as defaultProducts } from '@/data/products';
-import { categories } from '@/data/products';
+import { categories, type Product } from '@/data/products';
+import { products as productApi, admin as adminApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 const STORAGE_KEYS = {
   banner: 'hfd_site_banner',
@@ -74,16 +74,7 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
-function loadProducts(): Product[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.products);
-    if (!raw) return defaultProducts;
-    const parsed = JSON.parse(raw) as Product[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultProducts;
-  } catch {
-    return defaultProducts;
-  }
-}
+
 
 interface SiteContentContextValue {
   banner: BannerContent;
@@ -95,9 +86,9 @@ interface SiteContentContextValue {
   setHero: (hero: HeroContent) => void;
   setHeadings: (headings: HeadingsContent) => void;
   setProducts: (products: Product[]) => void;
-  addProduct: (product: Product) => void;
-  updateProduct: (id: string, product: Partial<Product>) => void;
-  removeProduct: (id: string) => void;
+  addProduct: (product: Product) => Promise<boolean>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<boolean>;
+  removeProduct: (id: string) => Promise<boolean>;
   resetToDefaults: () => void;
 }
 
@@ -113,7 +104,37 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
   const [headings, setHeadingsState] = useState<HeadingsContent>(() =>
     loadJson(STORAGE_KEYS.headings, DEFAULT_HEADINGS)
   );
-  const [products, setProductsState] = useState<Product[]>(loadProducts);
+  const [products, setProductsState] = useState<Product[]>([]);
+
+  useEffect(() => {
+    function toProduct(raw: Record<string, unknown>): Product {
+      return {
+        ...raw,
+        id: String(raw._id ?? raw.id ?? ''),
+        price: Number(raw.price),
+        originalPrice: raw.originalPrice != null ? Number(raw.originalPrice) : undefined,
+        image: raw.image != null ? String(raw.image) : '',
+        images: Array.isArray(raw.images) ? (raw.images as string[]) : undefined,
+      } as Product;
+    }
+
+    async function fetchProducts() {
+      try {
+        const res = await productApi.list({ limit: 1000 });
+        if (!res || typeof res !== 'object') return;
+        const resObj = res as Record<string, unknown>;
+        let rawList: unknown[] | null = null;
+        if (Array.isArray(resObj.products)) rawList = resObj.products as unknown[];
+        else if (Array.isArray(resObj.items)) rawList = resObj.items as unknown[];
+        else if (Array.isArray(res)) rawList = res as unknown[];
+        if (!rawList) return;
+        setProductsState(rawList.map((p) => toProduct(p as Record<string, unknown>)));
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      }
+    }
+    fetchProducts();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.banner, JSON.stringify(banner));
@@ -126,45 +147,83 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.headings, JSON.stringify(headings));
   }, [headings]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
-  }, [products]);
-
   const setBanner = useCallback((b: BannerContent) => setBannerState(b), []);
   const setHero = useCallback((h: HeroContent) => setHeroState(h), []);
   const setHeadings = useCallback((h: HeadingsContent) => setHeadingsState(h), []);
 
   const setProducts = useCallback((p: Product[]) => setProductsState(p), []);
 
-  const addProduct = useCallback((product: Product) => {
-    setProductsState((prev) => {
-      const maxId = prev.length
-        ? Math.max(...prev.map((p) => parseInt(p.id, 10) || 0))
-        : 0;
-      const id = String(maxId + 1);
-      return [...prev, { ...product, id }];
-    });
+  const addProduct = useCallback(async (product: Product): Promise<boolean> => {
+    try {
+      const { id, quantity, ...rest } = product;
+      const qty = quantity || 0;
+      
+      // Use Admin API to create product with stock
+      const res = await adminApi.createProduct({ 
+        product: rest as Record<string, unknown>, 
+        quantity: qty 
+      });
+
+      if (res && (res as any).success !== false) {
+         const createdId = (res as any).data?.product?._id || (res as any).data?._id || (res as any).id || 'new-id';
+         const newProduct = { ...product, id: createdId };
+         setProductsState(prev => [...prev, newProduct]);
+         toast.success('Product created successfully');
+         return true;
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Failed to create product:', error);
+      const msg = error?.message || 'Failed to create product';
+      toast.error(msg);
+      return false;
+    }
   }, []);
 
   const updateProduct = useCallback(
-    (id: string, updates: Partial<Product>) => {
-      setProductsState((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-      );
+    async (id: string, updates: Partial<Product>): Promise<boolean> => {
+      try {
+        const { quantity, ...productUpdates } = updates;
+        
+        // Use Admin API to update product and/or stock
+        await adminApi.updateProduct(id, { 
+          product: Object.keys(productUpdates).length > 0 ? productUpdates as Record<string, unknown> : undefined,
+          quantity: quantity
+        });
+
+        setProductsState((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+        );
+        toast.success('Product updated successfully');
+        return true;
+      } catch (error: any) {
+        console.error('Failed to update product:', error);
+        const msg = error?.message || 'Failed to update product';
+        toast.error(msg);
+        return false;
+      }
     },
     []
   );
 
-  const removeProduct = useCallback((id: string) => {
-    setProductsState((prev) => prev.filter((p) => p.id !== id));
+  const removeProduct = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      await productApi.delete(id);
+      setProductsState((prev) => prev.filter((p) => p.id !== id));
+      toast.success('Product deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      toast.error('Failed to delete product');
+      return false;
+    }
   }, []);
 
   const resetToDefaults = useCallback(() => {
     setBannerState(DEFAULT_BANNER);
     setHeroState(DEFAULT_HERO);
     setHeadingsState(DEFAULT_HEADINGS);
-    setProductsState(defaultProducts);
+    // setProductsState(defaultProducts); // Cannot reset products to default as they are from API
   }, []);
 
   const value: SiteContentContextValue = {

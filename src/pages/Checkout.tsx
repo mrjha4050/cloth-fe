@@ -17,20 +17,20 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/useCart';
 import { useAuth } from '@/context/AuthContext';
-import { addOrder } from '@/data/orders';
+import { orders as ordersApi, auth as authApi, ApiClientError, settings as settingsApi } from '@/lib/api';
 import { getProfile } from '@/lib/profile';
 import { cn } from '@/lib/utils';
 
 const SHIPPING_FREE_THRESHOLD = 2999;
-const SHIPPING_COST = 99;
 
 const Checkout = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const { items, cartCount, updateQuantity, removeItem, clearCart, isCartOpen, closeCart, openCart } = useCart();
 
+  const [shippingCost, setShippingCost] = useState<number>(99);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     fullName: '',
@@ -45,8 +45,19 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'cod'>('cod');
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_COST;
+  const shipping = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : shippingCost;
   const total = subtotal + shipping;
+
+  useEffect(() => {
+    settingsApi
+      .get()
+      .then((res) => {
+        if (res?.shippingCost != null && Number.isFinite(Number(res.shippingCost))) {
+          setShippingCost(Number(res.shippingCost));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -57,19 +68,42 @@ const Checkout = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    const profile = getProfile(user.email);
-    setForm((prev) => ({
-      ...prev,
-      fullName: prev.fullName || profile?.fullName || user.name || '',
-      email: user.email,
-      phone: prev.phone || profile?.phone || '',
-      addressLine1: prev.addressLine1 || profile?.addressLine1 || '',
-      addressLine2: prev.addressLine2 || profile?.addressLine2 || '',
-      city: prev.city || profile?.city || '',
-      state: prev.state || profile?.state || '',
-      pincode: prev.pincode || profile?.pincode || '',
-    }));
-  }, [isAuthenticated, user?.email]);
+    let cancelled = false;
+    authApi
+      .profile()
+      .then((profile) => {
+        if (cancelled || !profile) return;
+        setForm((prev) => ({
+          ...prev,
+          fullName: prev.fullName || profile.fullName || profile.name || user.name || '',
+          email: user.email,
+          phone: prev.phone || profile.phone || '',
+          addressLine1: prev.addressLine1 || profile.addressLine1 || (profile.address as string) || '',
+          addressLine2: prev.addressLine2 || profile.addressLine2 || '',
+          city: prev.city || profile.city || '',
+          state: prev.state || profile.state || '',
+          pincode: prev.pincode || profile.pincode || '',
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const local = getProfile(user.email);
+        setForm((prev) => ({
+          ...prev,
+          fullName: prev.fullName || local?.fullName || user.name || '',
+          email: user.email,
+          phone: prev.phone || local?.phone || '',
+          addressLine1: prev.addressLine1 || local?.addressLine1 || '',
+          addressLine2: prev.addressLine2 || local?.addressLine2 || '',
+          city: prev.city || local?.city || '',
+          state: prev.state || local?.state || '',
+          pincode: prev.pincode || local?.pincode || '',
+        }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.email, user?.name]);
 
   if (!isAuthenticated) {
     return null;
@@ -79,7 +113,7 @@ const Checkout = () => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) {
       toast.error('Your cart is empty');
@@ -90,13 +124,6 @@ const Checkout = () => {
       return;
     }
     setIsSubmitting(true);
-    const orderItems = items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      price: item.price,
-      quantity: item.quantity,
-    }));
     const shippingAddress = {
       fullName: form.fullName.trim(),
       email: form.email.trim(),
@@ -107,21 +134,37 @@ const Checkout = () => {
       state: form.state.trim(),
       pincode: form.pincode.trim(),
     };
-    setTimeout(() => {
-      addOrder({
-        status: 'confirmed',
-        items: orderItems,
+    try {
+      await ordersApi.create({
         shippingAddress,
-        subtotal,
-        shipping,
-        total,
         paymentMethod,
+        shipping,
       });
+      try {
+        await authApi.updateProfile({
+          fullName: shippingAddress.fullName,
+          phone: shippingAddress.phone,
+          addressLine1: shippingAddress.addressLine1,
+          addressLine2: shippingAddress.addressLine2,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          pincode: shippingAddress.pincode,
+        });
+      } catch {
+        // Profile save is best-effort; order already placed
+      }
       clearCart();
       toast.success('Order placed successfully! We’ll send a confirmation to your email.');
-      setIsSubmitting(false);
       navigate('/orders');
-    }, 800);
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError && err.message
+          ? err.message
+          : 'Could not place order. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (items.length === 0 && !isSubmitting) {

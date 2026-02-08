@@ -3,8 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Plus,
-  MessageCircle,
-  Heart,
   Share2,
   Star,
   ThumbsUp,
@@ -38,7 +36,7 @@ import {
   getCategoryDisplayName,
   type ProductDetail,
 } from '@/data/products';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/useCart';
 import { useSiteContent } from '@/context/SiteContentContext';
 import { cn } from '@/lib/utils';
 
@@ -102,7 +100,10 @@ const Product = () => {
 
   const product = getProductDetail(baseProduct) as ProductDetail;
   const categoryName = getCategoryDisplayName(product.category);
-  const maxRatingCount = Math.max(...product.ratingDistribution.map((d) => d.count));
+  const maxRatingCount =
+    product.ratingDistribution.length > 0
+      ? Math.max(...product.ratingDistribution.map((d) => d.count))
+      : 0;
 
   const handleAddToCart = () => {
     if (product.sizes.length > 1 && !selectedSize) {
@@ -122,6 +123,26 @@ const Product = () => {
     addItem(product);
     openCart();
     navigate('/');
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = product.name;
+    const text = `Check out ${product.name} on Chic Threads`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        toast.success('Link shared!');
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard');
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        await navigator.clipboard.writeText(url).catch(() => {});
+        toast.success('Link copied to clipboard');
+      }
+    }
   };
 
   return (
@@ -309,15 +330,11 @@ const Product = () => {
               </div>
 
               <div className="flex gap-6 pt-2 text-sm text-muted-foreground">
-                <button type="button" className="flex items-center gap-2 hover:text-foreground transition-colors">
-                  <MessageCircle className="h-4 w-4" />
-                  Chat
-                </button>
-                <button type="button" className="flex items-center gap-2 hover:text-foreground transition-colors">
-                  <Heart className="h-4 w-4" />
-                  Wishlist
-                </button>
-                <button type="button" className="flex items-center gap-2 hover:text-foreground transition-colors">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex items-center gap-2 hover:text-foreground transition-colors"
+                >
                   <Share2 className="h-4 w-4" />
                   Share
                 </button>
@@ -368,7 +385,9 @@ const Product = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <h2 className="text-xl font-semibold text-foreground">Reviews</h2>
                       <p className="text-sm text-muted-foreground">
-                        Showing {Math.min(5, product.reviews.length)} from {product.reviewCount} reviews
+                        {product.reviewCount === 0
+                          ? 'No reviews yet'
+                          : `Showing ${Math.min(5, product.reviews.length)} of ${product.reviewCount} reviews`}
                       </p>
                     </div>
                     <Select value={reviewSort} onValueChange={setReviewSort}>
@@ -384,7 +403,10 @@ const Product = () => {
 
                     <ScrollArea className="h-[400px] pr-4">
                       <ul className="space-y-6">
-                        {product.reviews.slice(0, 5).map((review) => (
+                        {product.reviews.length === 0 ? (
+                          <li className="py-8 text-center text-muted-foreground">No reviews yet. Be the first to review!</li>
+                        ) : (
+                        product.reviews.slice(0, 5).map((review) => (
                           <li key={review.id} className="border-b border-border pb-6 last:border-0">
                             <div className="flex gap-4">
                               <Avatar className="h-10 w-10 shrink-0">
@@ -415,7 +437,7 @@ const Product = () => {
                               </div>
                             </div>
                           </li>
-                        ))}
+                        )))}
                       </ul>
                     </ScrollArea>
                   </div>

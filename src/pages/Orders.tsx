@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
@@ -25,9 +25,42 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useCart } from '@/context/CartContext';
-import { getOrders, type Order } from '@/data/orders';
+import { useCart } from '@/context/useCart';
+import { useAuth } from '@/context/AuthContext';
+import { orders as ordersApi } from '@/lib/api';
+import type { Order, OrderItem, ShippingAddress } from '@/data/orders';
 import { cn } from '@/lib/utils';
+
+function mapApiOrderToOrder(raw: Record<string, unknown>): Order {
+  const items = (raw.items ?? raw.order_items ?? []) as Record<string, unknown>[];
+  const addr = (raw.shippingAddress ?? raw.shipping_address ?? {}) as Record<string, unknown>;
+  return {
+    id: String(raw.id ?? ''),
+    createdAt: String(raw.createdAt ?? raw.created_at ?? new Date().toISOString()),
+    status: (raw.status as Order['status']) ?? 'confirmed',
+    items: items.map((it) => ({
+      id: String(it.id ?? it.product_id ?? it.productId ?? ''),
+      name: String(it.name ?? ''),
+      image: String(it.image ?? ''),
+      price: Number(it.price ?? 0),
+      quantity: Number(it.quantity ?? 0),
+    })) as OrderItem[],
+    shippingAddress: {
+      fullName: String(addr.fullName ?? addr.full_name ?? ''),
+      email: String(addr.email ?? ''),
+      phone: String(addr.phone ?? ''),
+      addressLine1: String(addr.addressLine1 ?? addr.address_line1 ?? ''),
+      addressLine2: addr.addressLine2 ?? addr.address_line2,
+      city: String(addr.city ?? ''),
+      state: String(addr.state ?? ''),
+      pincode: String(addr.pincode ?? ''),
+    } as ShippingAddress,
+    subtotal: Number(raw.subtotal ?? 0),
+    shipping: Number(raw.shipping ?? 0),
+    total: Number(raw.total ?? 0),
+    paymentMethod: String(raw.paymentMethod ?? raw.payment_method ?? ''),
+  };
+}
 
 function OrderCard({ order }: { order: Order }) {
   const [open, setOpen] = useState(false);
@@ -155,8 +188,34 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 const Orders = () => {
+  const { isAuthenticated } = useAuth();
   const { cartCount, openCart, items, updateQuantity, removeItem, isCartOpen, closeCart } = useCart();
-  const orders = getOrders();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadOrders = useCallback(async () => {
+    if (!isAuthenticated) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await ordersApi.list({ page: 1, limit: 50 });
+      const rawList = (res?.items ?? res?.orders ?? []) as Record<string, unknown>[];
+      const mapped = rawList.map(mapApiOrderToOrder);
+      mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(mapped);
+    } catch {
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -194,7 +253,11 @@ const Orders = () => {
             View and track your order history
           </p>
 
-          {orders.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground">Loading orders…</p>
+            </div>
+          ) : orders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-border bg-card">
               <Package className="h-20 w-20 text-muted-foreground mb-4" />
               <h2 className="text-xl font-bold text-foreground mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>

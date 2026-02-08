@@ -14,7 +14,12 @@ import Auth from "./pages/Auth";
 import ProductList from "./pages/ProductList";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
+import { DashboardStats } from "./components/admin/DashboardStats";
+import { AdminProducts } from "./components/admin/AdminProducts";
+import { AdminTheme } from "./components/admin/AdminTheme";
+import { AdminSettings } from "./components/admin/AdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -24,9 +29,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <CartProvider>
-          <AuthProvider>
-            <SiteContentProvider>
+        <AuthProvider>
+          <SiteContentProvider>
+            <CartProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/product/:id" element={<Product />} />
@@ -35,13 +40,24 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/products" element={<ProductList />} />
                 <Route path="/profile" element={<Profile />} />
-                <Route path="/admin" element={<Admin />} />
+                <Route path="/admin" element={
+                  <ProtectedRoute>
+                    <Admin />
+                  </ProtectedRoute>
+                }>
+                    <Route index element={<DashboardStats />} />
+                    <Route path="products" element={<AdminProducts />} />
+                    <Route path="theme" element={<AdminTheme />} />
+                    <Route path="settings" element={<AdminSettings />} />
+                    {/* Placeholders for other routes */}
+                    <Route path="*" element={<div className="p-6">Page coming soon</div>} />
+                </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </SiteContentProvider>
-          </AuthProvider>
-        </CartProvider>
+            </CartProvider>
+          </SiteContentProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

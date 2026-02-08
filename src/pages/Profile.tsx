@@ -17,7 +17,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useAuth } from '@/context/AuthContext';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/useCart';
 import { getProfile, setProfile, type ProfileData } from '@/lib/profile';
 
 const emptyProfile: ProfileData = {

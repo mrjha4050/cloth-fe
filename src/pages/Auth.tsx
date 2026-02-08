@@ -18,8 +18,16 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useAuth } from '@/context/AuthContext';
-import { useCart } from '@/context/CartContext';
-import { ApiClientError } from '@/lib/api';
+import { useCart } from '@/context/useCart';
+import { auth as apiAuth, ApiClientError } from '@/lib/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 function getAuthErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiClientError) return err.message;
@@ -50,6 +58,34 @@ const Auth = () => {
   const [signupPhone, setSignupPhone] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotOpen = () => {
+    setForgotEmail(loginEmail);
+    setForgotOpen(true);
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) {
+      toast.error('Please enter your email');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await apiAuth.forgotPassword(email);
+      toast.success('If an account exists with this email, you will receive a password reset link.');
+      setForgotOpen(false);
+      setForgotEmail('');
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err, 'Request failed. Please try again.'));
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +237,7 @@ const Auth = () => {
                   <div className="flex justify-end">
                     <button
                       type="button"
+                      onClick={handleForgotOpen}
                       className="text-sm text-primary hover:underline"
                     >
                       Forgot password?
@@ -282,6 +319,39 @@ const Auth = () => {
           </div>
         </div>
       </main>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Enter your email and we&apos;ll send you a link to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="you@example.com"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                autoComplete="email"
+                className="h-11"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setForgotOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={forgotLoading}>
+                {forgotLoading ? 'Sending…' : 'Send reset link'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
       <Cart

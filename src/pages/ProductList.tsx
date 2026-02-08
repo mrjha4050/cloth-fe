@@ -15,7 +15,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useAuth } from '@/context/AuthContext';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/useCart';
 import { useSiteContent } from '@/context/SiteContentContext';
 import type { Product } from '@/data/products';
 

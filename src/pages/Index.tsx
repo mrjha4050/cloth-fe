@@ -5,7 +5,7 @@ import ProductGrid from '@/components/ProductGrid';
 import Features from '@/components/Features';
 import Footer from '@/components/Footer';
 import Cart from '@/components/Cart';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/useCart';
 import { Product } from '@/data/products';
 
 const Index = () => {

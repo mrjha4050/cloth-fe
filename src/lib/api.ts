@@ -12,6 +12,7 @@ const TOKEN_KEY = 'hfd_token';
 
 function getBaseUrl(): string {
   const url = import.meta.env.VITE_API_URL;
+  console.log('backend url:', url);
   return typeof url === 'string' && url.trim() ? url.trim().replace(/\/$/, '') : 'http://localhost:8080';
 }
 
@@ -71,6 +72,8 @@ export class ApiClientError extends Error {
 export interface RequestOptions {
   /** Skip adding Authorization header */
   skipAuth?: boolean;
+  /** Fetch cache mode; use 'no-store' for cart so refetch after add always gets fresh data */
+  cache?: RequestCache;
 }
 
 /**
@@ -99,6 +102,9 @@ export async function request<T = unknown>(
   if (body !== undefined && body !== null && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     init.body = JSON.stringify(body);
   }
+  if (options.cache !== undefined) {
+    init.cache = options.cache;
+  }
 
   const res = await fetch(url, init);
   let json: unknown;
@@ -117,10 +123,11 @@ export async function request<T = unknown>(
   if (json === undefined) return undefined as T;
   if (typeof json === 'object' && json !== null && 'data' in json) {
     const raw = json as Record<string, unknown>;
-    const inner = raw.data as Record<string, unknown> | undefined;
-    // Backend may send token at top level (e.g. { data: { user }, token }) — don't drop it
+    const inner = raw.data;
+    if (Array.isArray(inner)) return inner as T;
+    const innerObj = inner as Record<string, unknown> | undefined;
     const authKeys = ['token', 'accessToken', 'access_token', 'jwt', 'id_token'];
-    let result = inner && typeof inner === 'object' ? { ...inner } : {};
+    const result = innerObj && typeof innerObj === 'object' ? { ...innerObj } : {};
     for (const k of authKeys) {
       if (typeof raw[k] === 'string' && !(result as Record<string, unknown>)[k]) {
         (result as Record<string, unknown>)[k] = raw[k];
@@ -197,10 +204,32 @@ export const auth = {
   resetPassword: (token: string, newPassword: string) =>
     request<unknown>('POST', '/api/users/reset-password', { token, newPassword }, { skipAuth: true }),
 
-  profile: () => request<{ name?: string; email?: string; phone?: string; address?: string; city?: string; state?: string }>('GET', '/api/users/profile'),
+  profile: () =>
+    request<{
+      name?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      fullName?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+    }>('GET', '/api/users/profile'),
 
-  updateProfile: (body: { name?: string; phone?: string; address?: string; city?: string; state?: string; password?: string }) =>
-    request<unknown>('PUT', '/api/users/profile', body),
+  updateProfile: (body: {
+    name?: string;
+    fullName?: string;
+    phone?: string;
+    address?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    password?: string;
+  }) => request<unknown>('PUT', '/api/users/profile', body),
 };
 
 // ——— Products ———
@@ -217,6 +246,7 @@ export interface ProductQuery {
 export interface PaginatedResponse<T> {
   items?: T[];
   products?: T[];
+  orders?: T[];
   pagination?: { page: number; limit: number; total: number; pages: number };
 }
 
@@ -243,10 +273,27 @@ export const products = {
   delete: (id: string) => request<unknown>('DELETE', `/api/products/${id}`),
 };
 
-// ——— Cart ———
+// ——— Cart (backend cart model; response shape may be { cart: { items } } or { items }) ———
+
+export type CartItemRow = {
+  productId: string;
+  quantity: number;
+  itemId?: string;
+  /** Backend may use snake_case */
+  product_id?: string;
+  item_id?: string;
+  id?: string;
+};
+
+/** GET /api/cart – backend returns its cart model (e.g. { cart: { items } } or { items }) */
+export type CartGetResponse = {
+  items?: CartItemRow[];
+  cart?: { items?: CartItemRow[]; lines?: CartItemRow[] } | CartItemRow[];
+};
 
 export const cart = {
-  get: () => request<{ items?: Array<{ productId: string; quantity: number; itemId?: string }> }>('GET', '/api/cart'),
+  get: () =>
+    request<CartGetResponse>('GET', `/api/cart?t=${Date.now()}`, undefined, { cache: 'no-store' }),
 
   add: (productId: string, quantity: number) =>
     request<unknown>('POST', '/api/cart', { productId, quantity }),
@@ -267,6 +314,7 @@ export interface CreateOrderBody {
     email: string;
     phone: string;
     addressLine1: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -290,6 +338,57 @@ export const orders = {
 
   updateStatus: (id: string, status: 'confirmed' | 'shipped' | 'delivered') =>
     request<unknown>('PATCH', `/api/orders/${id}/status`, { status }),
+
+  listAdmin: (params?: { page?: number; limit?: number; status?: string; userId?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.page != null) sp.set('page', String(params.page));
+    if (params?.limit != null) sp.set('limit', String(params.limit));
+    if (params?.status) sp.set('status', params.status);
+    if (params?.userId) sp.set('userId', params.userId);
+    const q = sp.toString();
+    return request<PaginatedResponse<Record<string, unknown>>>('GET', `/api/orders/admin${q ? `?${q}` : ''}`);
+  },
+};
+
+// ——— Analytics ———
+
+export const analytics = {
+  stats: () => request<{
+    revenue: number;
+    activeOrders: number;
+    products: number;
+    activeUsers: number;
+  }>('GET', '/api/analytics/stats'),
+
+  recentVisits: () => request<unknown>('GET', '/api/analytics/recent-visits'),
+
+  timeStats: () => request<unknown>('GET', '/api/analytics/time-stats'),
+};
+
+// ——— Settings (public: for checkout display) ———
+
+export const settings = {
+  get: () =>
+    request<{ shippingCost?: number }>('GET', '/api/settings', undefined, { skipAuth: true }),
+};
+
+// ——— Admin ———
+
+export const admin = {
+  uploadInventory: (items: { productId: string; quantity: number }[]) =>
+    request<unknown>('POST', '/api/admin/inventory/upload', { items }),
+
+  createProduct: (data: { product: Record<string, unknown>; quantity: number }) =>
+    request<unknown>('POST', '/api/admin/inventory/products', data),
+
+  updateProduct: (productId: string, data: { product?: Record<string, unknown>; quantity?: number }) =>
+    request<unknown>('PUT', `/api/admin/inventory/products/${productId}`, data),
+
+  getSettings: () =>
+    request<{ shippingCost?: number }>('GET', '/api/admin/settings'),
+
+  updateSettings: (body: { shippingCost: number }) =>
+    request<unknown>('PUT', '/api/admin/settings', body),
 };
 
 // ——— Inventory ———
